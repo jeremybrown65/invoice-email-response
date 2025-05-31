@@ -78,6 +78,8 @@ if pdf_file:
             store_input = st.text_input("Enter store number(s)")
 
         if st.button("Generate Email Response"):
+            from email.message import EmailMessage
+            from pathlib import Path
             reply = tpl["reply"]
             attach_file = tpl.get("attach_file", False)
             df = st.session_state.store_df
@@ -116,6 +118,29 @@ if pdf_file:
                 st.download_button("Download Full Store List", output.getvalue(), file_name=f"allstores_{pdf_file.name.replace('.pdf', '.xlsx')}")
 
             st.text_area("Email Body", value=reply, height=150)
+
+            # Always prepare EML download
+            email_msg = EmailMessage()
+            email_msg["Subject"] = f"Response to: {pdf_file.name}"
+            email_msg["To"] = "DSao@techstyle.com"
+            email_msg.set_content(reply)
+
+            if tpl["attach_file"]:
+                if tpl["needs_store"] and len(numbers) > 1 and not filtered.empty:
+                    with io.BytesIO() as output:
+                        filtered.to_excel(output, index=False)
+                        output.seek(0)
+                        email_msg.add_attachment(output.read(), maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"filtered_{pdf_file.name.replace('.pdf', '.xlsx')}")
+                elif not tpl["needs_store"]:
+                    with io.BytesIO() as output:
+                        df.to_excel(output, index=False)
+                        output.seek(0)
+                        email_msg.add_attachment(output.read(), maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"allstores_{pdf_file.name.replace('.pdf', '.xlsx')}")
+
+            email_msg.add_attachment(pdf_file.getvalue(), maintype="application", subtype="pdf", filename=pdf_file.name)
+            eml_output = io.BytesIO(email_msg.as_bytes())
+            eml_filename = pdf_file.name.replace(".pdf", "_reply.eml")
+            st.download_button("📩 Download .eml Draft", eml_output.getvalue(), file_name=eml_filename)
 
             if st.button("📤 Create Outlook Draft"):
                 import subprocess
