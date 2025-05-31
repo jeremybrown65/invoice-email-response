@@ -120,6 +120,7 @@ if pdf_file:
             if st.button("📤 Create Outlook Draft"):
                 import subprocess
                 import tempfile
+                from pathlib import Path
 
                 # Save the attachment temporarily if it exists
                 attachment_path = ""
@@ -141,6 +142,7 @@ if pdf_file:
                 safe_reply = json.dumps(reply)[1:-1]
                 safe_subject = f"Response to: {pdf_file.name}"
 
+                # AppleScript (for local use only)
                 script = f'''
                 tell application "Microsoft Outlook"
                     set newMessage to make new outgoing message with properties {{subject:"{safe_subject}", content:"{safe_reply}"}}
@@ -157,4 +159,27 @@ if pdf_file:
                 end tell
                 '''
 
-                subprocess.run(["osascript", "-e", script])
+                try:
+                    subprocess.run(["osascript", "-e", script])
+                except Exception as e:
+                    st.warning(f"AppleScript execution skipped or failed: {e}")
+
+                # EML export (for web use)
+                from email.message import EmailMessage
+                email_msg = EmailMessage()
+                email_msg["Subject"] = safe_subject
+                email_msg["To"] = "DSao@techstyle.com"
+                email_msg.set_content(reply)
+
+                # Attach files if they exist
+                if attachment_path and Path(attachment_path).exists():
+                    with open(attachment_path, "rb") as f:
+                        email_msg.add_attachment(f.read(), maintype="application", subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=Path(attachment_path).name)
+
+                if pdf_path and Path(pdf_path).exists():
+                    with open(pdf_path, "rb") as f:
+                        email_msg.add_attachment(f.read(), maintype="application", subtype="pdf", filename=Path(pdf_path).name)
+
+                eml_output = io.BytesIO(email_msg.as_bytes())
+                eml_filename = pdf_file.name.replace(".pdf", "_reply.eml")
+                st.download_button("📩 Download .eml Draft", eml_output.getvalue(), file_name=eml_filename)
