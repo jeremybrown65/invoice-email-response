@@ -139,3 +139,22 @@ if pdf_file:
 
                 import json
                 safe_reply = json.dumps(reply)[1:-1]
+                safe_subject = f"Response to: {pdf_file.name}"
+
+                script = f'''
+                tell application "Microsoft Outlook"
+                    set newMessage to make new outgoing message with properties {{subject:"{safe_subject}", content:"{safe_reply}"}}
+                    make new recipient at newMessage with properties {{email address:{{name:"D S", address:"DSao@techstyle.com"}}}}
+                    tell newMessage
+                        if "{attachment_path}" is not "" then
+                            make new attachment with properties {{file:"{attachment_path}"}}
+                        end if
+                        if "{pdf_path}" is not "" then
+                            make new attachment with properties {{file:"{pdf_path}"}}
+                        end if
+                    end tell
+                    open newMessage
+                end tell
+                '''
+
+                subprocess.run(["osascript", "-e", script])
